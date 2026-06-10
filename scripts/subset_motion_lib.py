@@ -15,22 +15,47 @@
 # limitations under the License.
 
 """
-Script to create a subset of a motion library by sampling every N motions.
-Might be useful if you realize your GPU cannot load large motion libraries.
+Script to create a subset of a motion library.
+
+Two selection modes:
+  * ``--sample-every N`` keeps every Nth motion (useful when a GPU cannot load
+    a large motion library).
+  * ``--indices i j k ...`` keeps only the given motion indices (useful for
+    extracting one or a few specific clips, e.g. a single walking motion).
+
+Examples
+--------
+# Extract a single walking clip (index 42) into its own .pt file
+python scripts/subset_motion_lib.py \\
+    data/motion_for_trackers/g1_bones_seed_mini.pt \\
+    data/motion_for_trackers/g1_walk_only.pt \\
+    --indices 42
+
+# Keep every 200th motion
+python scripts/subset_motion_lib.py input.pt output.pt --sample-every 200
 """
 
+import argparse
 import torch
 from pathlib import Path
+from typing import List, Optional
 
 
-def subset_motion_lib(input_path: str, output_path: str, sample_every: int = 200):
+def subset_motion_lib(
+    input_path: str,
+    output_path: str,
+    sample_every: int = 200,
+    indices: Optional[List[int]] = None,
+):
     """
-    Load a motion library and create a subset by sampling every N motions.
-    
+    Load a motion library and create a subset of it.
+
     Args:
         input_path: Path to input .pt motion library
         output_path: Path to output .pt file
-        sample_every: Take every Nth motion (default: 200)
+        sample_every: Take every Nth motion (used only when ``indices`` is None)
+        indices: Explicit list of motion indices to keep. When provided, this
+            takes precedence over ``sample_every``.
     """
     print(f"Loading motion library from {input_path}")
     data = torch.load(input_path, map_location="cpu", weights_only=False)
@@ -39,10 +64,19 @@ def subset_motion_lib(input_path: str, output_path: str, sample_every: int = 200
     num_motions = len(data["motion_lengths"])
     print(f"Original motion library has {num_motions} motions")
     
-    # Select motion indices (every sample_every motions)
-    selected_indices = list(range(0, num_motions, sample_every))
+    # Select motion indices
+    if indices is not None:
+        for idx in indices:
+            if idx < 0 or idx >= num_motions:
+                raise IndexError(
+                    f"Motion index {idx} is out of range [0, {num_motions - 1}]"
+                )
+        selected_indices = list(indices)
+        print(f"Selecting {len(selected_indices)} motion(s) by index: {selected_indices}")
+    else:
+        selected_indices = list(range(0, num_motions, sample_every))
+        print(f"Selecting {len(selected_indices)} motions (every {sample_every}th)")
     num_selected = len(selected_indices)
-    print(f"Selecting {num_selected} motions (every {sample_every}th)")
     
     # Get the frame ranges for each selected motion
     length_starts = data["length_starts"]
@@ -105,4 +139,38 @@ def subset_motion_lib(input_path: str, output_path: str, sample_every: int = 200
     print(f"\nSaved subset to {output_path}")
     print(f"  Motions: {num_motions} -> {num_selected}")
     print(f"  Total frames: {len(data['gts'])} -> {len(new_data['gts'])}")
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Create a subset of a packaged .pt motion library."
+    )
+    parser.add_argument("input_path", help="Path to input .pt motion library")
+    parser.add_argument("output_path", help="Path to output .pt file")
+    parser.add_argument(
+        "--indices",
+        type=int,
+        nargs="+",
+        default=None,
+        help="Explicit motion indices to keep (e.g. --indices 42). "
+        "Takes precedence over --sample-every.",
+    )
+    parser.add_argument(
+        "--sample-every",
+        type=int,
+        default=200,
+        help="Keep every Nth motion (default: 200). Ignored when --indices is set.",
+    )
+    args = parser.parse_args()
+
+    subset_motion_lib(
+        input_path=args.input_path,
+        output_path=args.output_path,
+        sample_every=args.sample_every,
+        indices=args.indices,
+    )
+
+
+if __name__ == "__main__":
+    main()
 

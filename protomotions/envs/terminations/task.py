@@ -18,13 +18,19 @@
 Provides termination conditions for specific tasks:
 - Path following terminations
 - Steering terminations
+
+NOTE: These functions are referenced directly as ``compute_func`` in MdpComponents
+(e.g. via the evaluation factories in ``component_factories.py``), so they end up
+inside the resolved configs that ``train_agent.save_configs`` pickles. A
+``torch.jit.script`` function is a ScriptFunction and cannot be pickled, so do NOT
+decorate these with ``@torch.jit.script`` (unlike the internal helpers in ``base.py``,
+which are only called from regular wrapper functions and never stored in a config).
 """
 
 import torch
 from torch import Tensor
 
 
-@torch.jit.script
 def check_path_distance_term(
     head_pos: Tensor,
     target_pos: Tensor,
@@ -54,7 +60,6 @@ def check_path_distance_term(
     return tar_fail
 
 
-@torch.jit.script
 def check_path_height_term(
     head_pos: Tensor,
     target_pos: Tensor,
@@ -90,7 +95,6 @@ def check_path_height_term(
 # ==============================================================================
 
 
-@torch.jit.script
 def check_steering_velocity_error(
     root_pos: Tensor,
     prev_root_pos: Tensor,

@@ -615,6 +615,11 @@ class MotionLib:
             assert loaded_data[field] is not None, f"Field {field} is None"
             setattr(self, field, loaded_data[field])
 
+        # Packaged files created without contact labels won't include this field,
+        # so the attribute may not exist after loading.
+        if not hasattr(self, "contacts"):
+            self.contacts = None
+
         if (
             self.contacts is not None
             and self.contacts.numel() > 0
