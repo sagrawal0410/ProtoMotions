@@ -80,11 +80,11 @@ def compute_heading_velocity_rew(
         Reward [num_envs] in range [0, 1].
     """
 
-    vel_err_scale = 20.0
+    vel_err_scale = 0.2
     tangent_err_w = 0.1
 
     dir_reward_w = 0.9
-    facing_reward_w = 0.0
+    facing_reward_w = 0.3
 
     # Compute velocity in target direction
     delta_root_pos = root_pos - prev_root_pos
